@@ -36,14 +36,14 @@ const constParser = (lit: string): Parser<string> =>
 
 // 数字のパーサ
 const numRegex = /^\-?\d+/;
-const numParser = new Parser(src => {
+const numParser = new Parser<string>(src => {
   const match = numRegex.exec(src);
   if (match) {
-    return parseSuccess(parseInt(match[0], 10), match[0].length);
+    return parseSuccess(match[0], match[0].length);
   } else {
     return parseFailure([`expect a number, but got '${src[0]}...'`]);
   }
-});
+}).map(x => parseInt(x, 10));
 
 const hogeParser = constParser("hoge");
 
