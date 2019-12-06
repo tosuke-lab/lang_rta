@@ -99,6 +99,18 @@ function seq(...parsers: Parser<unknown>[]): Parser<any[]> {
   });
 }
 
+// パーサを並べて、最初に成功したものを返す
+const or = <A>(...parsers: Parser<A>[]) =>
+  new Parser<A>(src => {
+    const reasons: string[] = [];
+    for (const parser of parsers) {
+      const r = parser.parse(src);
+      if (r.type === "success") return r;
+      reasons.push(...r.reasons);
+    }
+    return parseFailure(reasons);
+  });
+
 // 渡された文字列で成功するパーサを返す関数
 const constParser = (lit: string): Parser<string> =>
   new Parser(src =>
@@ -128,14 +140,15 @@ const spaceParser = new Parser<string>(src => {
   throw "unreachable!";
 });
 
-// 足し算を処理するパーサ
-const plusParser = seq(
+// 足し算と引き算を処理するパーサ
+const plusMinusParser = seq(
   numParser,
   spaceParser,
-  constParser("+"),
+  or(constParser("+"), constParser("-")),
   spaceParser,
   numParser
-).map(([lhs, , , , rhs]) => lhs + rhs);
+).map(([lhs, , op, , rhs]) => (op === "+" ? lhs + rhs : lhs - rhs));
 
-console.log(plusParser.parse("1+1")); // -> 2
-console.log(plusParser.parse("1 + 1")); // -> 2
+console.log(plusMinusParser.parse("1+1")); // -> 2
+console.log(plusMinusParser.parse("1 + 1")); // -> 2
+console.log(plusMinusParser.parse("2 - 1")); // -> 1
