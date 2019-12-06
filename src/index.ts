@@ -20,7 +20,21 @@ const constParser = (lit: string): Parser<string> => src =>
     ? parseSuccess(lit, lit.length)
     : parseFailure([`expect 'hoge', but got '${src.slice(0, lit.length)}'`]);
 
+// 数字のパーサ
+const numRegex = /^\-?\d+/;
+const numParser: Parser<number> = src => {
+  const match = numRegex.exec(src);
+  if (match) {
+    return parseSuccess(parseInt(match[0], 10), match[0].length);
+  } else {
+    return parseFailure([`expect a number, but got '${src[0]}...'`]);
+  }
+};
+
 const hogeParser = constParser("hoge");
 
 console.log(hogeParser("hogepoyo")); // => Success!
 console.log(hogeParser("foobar")); // => Failure
+
+console.log(numParser("10 "));
+console.log(numParser("hoge"));
