@@ -26,6 +26,79 @@ class Parser<A> {
   }
 }
 
+// パーサを繋ぐ
+function seq<A>(p1: Parser<A>): Parser<[A]>;
+function seq<A, B>(p1: Parser<A>, p2: Parser<B>): Parser<[A, B]>;
+function seq<A, B, C>(
+  p1: Parser<A>,
+  p2: Parser<B>,
+  p3: Parser<C>
+): Parser<[A, B, C]>;
+function seq<A, B, C, D>(
+  p1: Parser<A>,
+  p2: Parser<B>,
+  p3: Parser<C>,
+  p4: Parser<D>
+): Parser<[A, B, C, D]>;
+function seq<A, B, C, D, E>(
+  p1: Parser<A>,
+  p2: Parser<B>,
+  p3: Parser<C>,
+  p4: Parser<D>,
+  p5: Parser<E>
+): Parser<[A, B, C, D, E]>;
+function seq<A, B, C, D, E, F>(
+  p1: Parser<A>,
+  p2: Parser<B>,
+  p3: Parser<C>,
+  p4: Parser<D>,
+  p5: Parser<E>,
+  p6: Parser<F>
+): Parser<[A, B, C, D, E, F]>;
+function seq<A, B, C, D, E, F, G>(
+  p1: Parser<A>,
+  p2: Parser<B>,
+  p3: Parser<C>,
+  p4: Parser<D>,
+  p5: Parser<E>,
+  p6: Parser<F>,
+  p7: Parser<G>
+): Parser<[A, B, C, D, E, F, G]>;
+function seq<A, B, C, D, E, F, G, H>(
+  p1: Parser<A>,
+  p2: Parser<B>,
+  p3: Parser<C>,
+  p4: Parser<D>,
+  p5: Parser<E>,
+  p6: Parser<F>,
+  p7: Parser<G>,
+  p8: Parser<H>
+): Parser<[A, B, C, D, E, F, G, H]>;
+function seq<A, B, C, D, E, F, G, H, I>(
+  p1: Parser<A>,
+  p2: Parser<B>,
+  p3: Parser<C>,
+  p4: Parser<D>,
+  p5: Parser<E>,
+  p6: Parser<F>,
+  p7: Parser<G>,
+  p8: Parser<H>,
+  p9: Parser<I>
+): Parser<[A, B, C, D, E, F, G, H, I]>;
+function seq(...parsers: Parser<unknown>[]): Parser<any[]> {
+  return new Parser(src => {
+    const result: unknown[] = [];
+    let consumed = 0;
+    for (const parser of parsers) {
+      const r = parser.parse(src.slice(consumed));
+      if (r.type === "failure") return r;
+      consumed += r.consumed;
+      result.push(r.result);
+    }
+    return parseSuccess(result, consumed);
+  });
+}
+
 // 渡された文字列で成功するパーサを返す関数
 const constParser = (lit: string): Parser<string> =>
   new Parser(src =>
@@ -45,29 +118,24 @@ const numParser = new Parser<string>(src => {
   }
 }).map(x => parseInt(x, 10));
 
-// 足し算を処理するパーサ
-const plusParser = new Parser<number>(src => {
-  let consumed = 0;
-  const lhs = numParser.parse(src);
-  if (lhs.type === "success") {
-    consumed += lhs.consumed;
-    const plus = constParser("+").parse(src.slice(consumed));
-    if (plus.type === "success") {
-      consumed += plus.consumed;
-      const rhs = numParser.parse(src.slice(consumed));
-      if (rhs.type === "success") {
-        consumed += rhs.consumed;
-        return parseSuccess(lhs.result + rhs.result, consumed);
-      } else {
-        return rhs;
-      }
-    } else {
-      return plus;
-    }
-  } else {
-    return lhs;
+// スペースのパーサ
+const spaceRegex = /^\s*/;
+const spaceParser = new Parser<string>(src => {
+  const match = spaceRegex.exec(src);
+  if (match) {
+    return parseSuccess(match[0], match[0].length);
   }
+  throw "unreachable!";
 });
 
+// 足し算を処理するパーサ
+const plusParser = seq(
+  numParser,
+  spaceParser,
+  constParser("+"),
+  spaceParser,
+  numParser
+).map(([lhs, , , , rhs]) => lhs + rhs);
+
 console.log(plusParser.parse("1+1")); // -> 2
-console.log(plusParser.parse("1 + 1")); // -> ????
+console.log(plusParser.parse("1 + 1")); // -> 2
