@@ -12,29 +12,33 @@ const parseFailure = <A>(reasons: string[]): Result<A> => ({
   reasons
 });
 
-type Parser<A> = (src: string) => Result<A>;
+class Parser<A> {
+  constructor(readonly parse: (src: string) => Result<A>) {}
+}
 
 // 渡された文字列で成功するパーサを返す関数
-const constParser = (lit: string): Parser<string> => src =>
-  src.startsWith(lit)
-    ? parseSuccess(lit, lit.length)
-    : parseFailure([`expect 'hoge', but got '${src.slice(0, lit.length)}'`]);
+const constParser = (lit: string): Parser<string> =>
+  new Parser(src =>
+    src.startsWith(lit)
+      ? parseSuccess(lit, lit.length)
+      : parseFailure([`expect 'hoge', but got '${src.slice(0, lit.length)}'`])
+  );
 
 // 数字のパーサ
 const numRegex = /^\-?\d+/;
-const numParser: Parser<number> = src => {
+const numParser = new Parser(src => {
   const match = numRegex.exec(src);
   if (match) {
     return parseSuccess(parseInt(match[0], 10), match[0].length);
   } else {
     return parseFailure([`expect a number, but got '${src[0]}...'`]);
   }
-};
+});
 
 const hogeParser = constParser("hoge");
 
-console.log(hogeParser("hogepoyo")); // => Success!
-console.log(hogeParser("foobar")); // => Failure
+console.log(hogeParser.parse("hogepoyo")); // => Success!
+console.log(hogeParser.parse("foobar")); // => Failure
 
-console.log(numParser("10 "));
-console.log(numParser("hoge"));
+console.log(numParser.parse("10 "));
+console.log(numParser.parse("hoge"));
