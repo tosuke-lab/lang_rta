@@ -14,6 +14,16 @@ const parseFailure = <A>(reasons: string[]): Result<A> => ({
 
 class Parser<A> {
   constructor(readonly parse: (src: string) => Result<A>) {}
+  map<B>(f: (x: A) => B) {
+    return new Parser(src => {
+      const r = this.parse(src);
+      if (r.type === "success") {
+        return parseSuccess(f(r.result), r.consumed);
+      } else {
+        return r;
+      }
+    });
+  }
 }
 
 // 渡された文字列で成功するパーサを返す関数
