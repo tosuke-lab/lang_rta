@@ -14,11 +14,13 @@ const parseFailure = <A>(reasons: string[]): Result<A> => ({
 
 type Parser<A> = (src: string) => Result<A>;
 
-// hogeで成功するパーサ
-const hogeParser: Parser<string> = src =>
-  src.startsWith("hoge")
-    ? parseSuccess("hoge", 4)
-    : parseFailure([`expect 'hoge', but got '${src.slice(0, 4)}'`]);
+// 渡された文字列で成功するパーサを返す関数
+const constParser = (lit: string): Parser<string> => src =>
+  src.startsWith(lit)
+    ? parseSuccess(lit, lit.length)
+    : parseFailure([`expect 'hoge', but got '${src.slice(0, lit.length)}'`]);
+
+const hogeParser = constParser("hoge");
 
 console.log(hogeParser("hogepoyo")); // => Success!
 console.log(hogeParser("foobar")); // => Failure
