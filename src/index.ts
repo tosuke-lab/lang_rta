@@ -45,10 +45,29 @@ const numParser = new Parser<string>(src => {
   }
 }).map(x => parseInt(x, 10));
 
-const hogeParser = constParser("hoge");
+// 足し算を処理するパーサ
+const plusParser = new Parser<number>(src => {
+  let consumed = 0;
+  const lhs = numParser.parse(src);
+  if (lhs.type === "success") {
+    consumed += lhs.consumed;
+    const plus = constParser("+").parse(src.slice(consumed));
+    if (plus.type === "success") {
+      consumed += plus.consumed;
+      const rhs = numParser.parse(src.slice(consumed));
+      if (rhs.type === "success") {
+        consumed += rhs.consumed;
+        return parseSuccess(lhs.result + rhs.result, consumed);
+      } else {
+        return rhs;
+      }
+    } else {
+      return plus;
+    }
+  } else {
+    return lhs;
+  }
+});
 
-console.log(hogeParser.parse("hogepoyo")); // => Success!
-console.log(hogeParser.parse("foobar")); // => Failure
-
-console.log(numParser.parse("10 "));
-console.log(numParser.parse("hoge"));
+console.log(plusParser.parse("1+1")); // -> 2
+console.log(plusParser.parse("1 + 1")); // -> ????
