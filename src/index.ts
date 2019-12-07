@@ -124,6 +124,20 @@ const many = <A>(parser: Parser<A>) =>
     }
   });
 
+class Literal {
+  constructor(readonly value: number) {}
+}
+
+class Add {
+  constructor(readonly lhs: Expr, readonly rhs: Expr) {}
+}
+
+class Sub {
+  constructor(readonly lhs: Expr, readonly rhs: Expr) {}
+}
+
+type Expr = Literal | Add | Sub;
+
 // 渡された文字列で成功するパーサを返す関数
 const constParser = (lit: string): Parser<string> =>
   new Parser(src =>
@@ -141,7 +155,7 @@ const numParser = new Parser<string>(src => {
   } else {
     return parseFailure([`expect a number, but got '${src[0]}...'`]);
   }
-}).map(x => parseInt(x, 10));
+}).map(x => new Literal(parseInt(x, 10)));
 
 // スペースのパーサ
 const spaceRegex = /^\s*/;
@@ -163,17 +177,16 @@ const plusMinusParser = seq(
       spaceParser,
       numParser
     ).map(
-      ([, op, , num]) =>
-        [op === "+" ? ("+" as const) : ("-" as const), num] as const
+      ([, op, , expr]) =>
+        [op === "+" ? ("+" as const) : ("-" as const), expr] as const
     )
   )
-).map(([num, ops]) => {
-  for (const op of ops) {
-    if (op[0] === "+") num += op[1];
-    else num -= op[1];
-  }
-  return num;
-});
+).map(([num, ops]) =>
+  ops.reduce(
+    (pre, op) => (op[0] === "+" ? new Add(pre, op[1]) : new Sub(pre, op[1])),
+    num as Expr
+  )
+);
 
 console.log(plusMinusParser.parse("1")); // -> 1
 console.log(plusMinusParser.parse("1+1")); // -> 2
