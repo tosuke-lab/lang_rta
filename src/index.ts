@@ -141,14 +141,36 @@ const spaceParser = new Parser<string>(src => {
 });
 
 // 足し算と引き算を処理するパーサ
-const plusMinusParser = seq(
-  numParser,
-  spaceParser,
-  or(constParser("+"), constParser("-")),
-  spaceParser,
-  numParser
-).map(([lhs, , op, , rhs]) => (op === "+" ? lhs + rhs : lhs - rhs));
+const plusMinus = new Parser<["+" | "-", number][]>(src => {
+  const tmp = seq(
+    spaceParser,
+    or(constParser("+"), constParser("-")),
+    spaceParser,
+    numParser
+  ).map(
+    ([, op, , num]) =>
+      [op === "+" ? ("+" as const) : ("-" as const), num] as const
+  );
+  const result: ["+" | "-", number][] = [];
+  let consumed = 0;
+  while (true) {
+    const r = tmp.parse(src.slice(consumed));
+    if (r.type === "failure") return parseSuccess(result, consumed);
+    const [op, num] = r.result;
+    result.push([op, num]);
+    consumed += r.consumed;
+  }
+});
+const plusMinusParser = seq(numParser, plusMinus).map(([num, ops]) => {
+  for (const op of ops) {
+    if (op[0] === "+") num += op[1];
+    else num -= op[1];
+  }
+  return num;
+});
 
+console.log(plusMinusParser.parse("1")); // -> 1
 console.log(plusMinusParser.parse("1+1")); // -> 2
 console.log(plusMinusParser.parse("1 + 1")); // -> 2
 console.log(plusMinusParser.parse("2 - 1")); // -> 1
+console.log(plusMinusParser.parse("1+1-2")); // -> 0
