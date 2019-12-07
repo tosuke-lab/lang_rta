@@ -193,3 +193,28 @@ console.log(plusMinusParser.parse("1+1")); // -> 2
 console.log(plusMinusParser.parse("1 + 1")); // -> 2
 console.log(plusMinusParser.parse("2 - 1")); // -> 1
 console.log(plusMinusParser.parse("1+1-2")); // -> 0
+
+const evaluate = (ast: Expr): number => {
+  if (ast instanceof Literal) {
+    return ast.value;
+  } else if (ast instanceof Add) {
+    return evaluate(ast.lhs) + evaluate(ast.rhs);
+  } else if (ast instanceof Sub) {
+    return evaluate(ast.lhs) - evaluate(ast.rhs);
+  } else {
+    const _exhaustiveCheck: never = ast;
+    throw "unreached";
+  }
+};
+
+const run = (src: string) => {
+  const r = plusMinusParser.parse(src);
+  if (r.type === "failure") {
+    console.error(r.reasons);
+    return;
+  }
+  const ast = r.result;
+  console.log(evaluate(ast));
+};
+
+run("1 + 1 - 2");
