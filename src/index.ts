@@ -111,6 +111,19 @@ const or = <A>(...parsers: Parser<A>[]) =>
     return parseFailure(reasons);
   });
 
+// パーサを連続して適用する
+const many = <A>(parser: Parser<A>) =>
+  new Parser<A[]>(src => {
+    const result: A[] = [];
+    let consumed = 0;
+    while (true) {
+      const r = parser.parse(src.slice(consumed));
+      if (r.type === "failure") return parseSuccess(result, consumed);
+      result.push(r.result);
+      consumed += r.consumed;
+    }
+  });
+
 // 渡された文字列で成功するパーサを返す関数
 const constParser = (lit: string): Parser<string> =>
   new Parser(src =>
@@ -141,27 +154,20 @@ const spaceParser = new Parser<string>(src => {
 });
 
 // 足し算と引き算を処理するパーサ
-const plusMinus = new Parser<["+" | "-", number][]>(src => {
-  const tmp = seq(
-    spaceParser,
-    or(constParser("+"), constParser("-")),
-    spaceParser,
-    numParser
-  ).map(
-    ([, op, , num]) =>
-      [op === "+" ? ("+" as const) : ("-" as const), num] as const
-  );
-  const result: ["+" | "-", number][] = [];
-  let consumed = 0;
-  while (true) {
-    const r = tmp.parse(src.slice(consumed));
-    if (r.type === "failure") return parseSuccess(result, consumed);
-    const [op, num] = r.result;
-    result.push([op, num]);
-    consumed += r.consumed;
-  }
-});
-const plusMinusParser = seq(numParser, plusMinus).map(([num, ops]) => {
+const plusMinusParser = seq(
+  numParser,
+  many(
+    seq(
+      spaceParser,
+      or(constParser("+"), constParser("-")),
+      spaceParser,
+      numParser
+    ).map(
+      ([, op, , num]) =>
+        [op === "+" ? ("+" as const) : ("-" as const), num] as const
+    )
+  )
+).map(([num, ops]) => {
   for (const op of ops) {
     if (op[0] === "+") num += op[1];
     else num -= op[1];
