@@ -136,7 +136,15 @@ class Sub {
   constructor(readonly lhs: Expr, readonly rhs: Expr) {}
 }
 
-type Expr = Literal | Add | Sub;
+class Mul {
+  constructor(readonly lhs: Expr, readonly rhs: Expr) {}
+}
+
+class Div {
+  constructor(readonly lhs: Expr, readonly rhs: Expr) {}
+}
+
+type Expr = Literal | Add | Sub | Mul | Div;
 
 // 渡された文字列で成功するパーサを返す関数
 const constParser = (lit: string): Parser<string> =>
@@ -167,15 +175,33 @@ const spaceParser = new Parser<string>(src => {
   throw "unreachable!";
 });
 
+// かけ算と割り算を処理するパーサ
+const mulDivParser = seq(
+  numParser,
+  many(
+    seq(
+      spaceParser,
+      or(constParser("*"), constParser("/")),
+      spaceParser,
+      numParser
+    ).map(([, op, , expr]) => [op, expr] as const)
+  )
+).map(([expr, ops]) =>
+  ops.reduce(
+    (pre, op) => (op[0] === "*" ? new Mul(pre, op[1]) : new Div(pre, op[1])),
+    expr as Expr
+  )
+);
+
 // 足し算と引き算を処理するパーサ
 const plusMinusParser = seq(
-  numParser,
+  mulDivParser,
   many(
     seq(
       spaceParser,
       or(constParser("+"), constParser("-")),
       spaceParser,
-      numParser
+      mulDivParser
     ).map(
       ([, op, , expr]) =>
         [op === "+" ? ("+" as const) : ("-" as const), expr] as const
@@ -188,12 +214,6 @@ const plusMinusParser = seq(
   )
 );
 
-console.log(plusMinusParser.parse("1")); // -> 1
-console.log(plusMinusParser.parse("1+1")); // -> 2
-console.log(plusMinusParser.parse("1 + 1")); // -> 2
-console.log(plusMinusParser.parse("2 - 1")); // -> 1
-console.log(plusMinusParser.parse("1+1-2")); // -> 0
-
 const evaluate = (ast: Expr): number => {
   if (ast instanceof Literal) {
     return ast.value;
@@ -201,14 +221,20 @@ const evaluate = (ast: Expr): number => {
     return evaluate(ast.lhs) + evaluate(ast.rhs);
   } else if (ast instanceof Sub) {
     return evaluate(ast.lhs) - evaluate(ast.rhs);
+  } else if (ast instanceof Mul) {
+    return evaluate(ast.lhs) * evaluate(ast.rhs);
+  } else if (ast instanceof Div) {
+    return evaluate(ast.lhs) / evaluate(ast.rhs);
   } else {
     const _exhaustiveCheck: never = ast;
     throw "unreached";
   }
 };
 
+const exprParser: Parser<Expr> = plusMinusParser;
+
 const run = (src: string) => {
-  const r = plusMinusParser.parse(src);
+  const r = exprParser.parse(src);
   if (r.type === "failure") {
     console.error(r.reasons);
     return;
@@ -217,4 +243,4 @@ const run = (src: string) => {
   console.log(evaluate(ast));
 };
 
-run("1 + 1 - 2");
+run("1 + 2 * 3 + 4");
