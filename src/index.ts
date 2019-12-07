@@ -124,6 +124,10 @@ const many = <A>(parser: Parser<A>) =>
     }
   });
 
+// 遅延させる
+const lazy = <A>(parser: () => Parser<A>) =>
+  new Parser<A>(src => parser().parse(src));
+
 class Literal {
   constructor(readonly value: number) {}
 }
@@ -163,7 +167,7 @@ const numParser = new Parser<string>(src => {
   } else {
     return parseFailure([`expect a number, but got '${src[0]}...'`]);
   }
-}).map(x => new Literal(parseInt(x, 10)));
+}).map(x => new Literal(parseInt(x, 10)) as Expr);
 
 // スペースのパーサ
 const spaceRegex = /^\s*/;
@@ -175,44 +179,66 @@ const spaceParser = new Parser<string>(src => {
   throw "unreachable!";
 });
 
-// かけ算と割り算を処理するパーサ
-const mulDivParser = seq(
-  numParser,
-  many(
+// 括弧
+function primeParser() {
+  return or(
+    numParser,
     seq(
+      constParser("("),
       spaceParser,
-      or(constParser("*"), constParser("/")),
+      lazy(exprParser),
       spaceParser,
-      numParser
-    ).map(([, op, , expr]) => [op, expr] as const)
-  )
-).map(([expr, ops]) =>
-  ops.reduce(
-    (pre, op) => (op[0] === "*" ? new Mul(pre, op[1]) : new Div(pre, op[1])),
-    expr as Expr
-  )
-);
+      constParser(")")
+    ).map(([, , expr]) => expr)
+  );
+}
+
+// かけ算と割り算を処理するパーサ
+function mulDivParser() {
+  return seq(
+    primeParser(),
+    many(
+      seq(
+        spaceParser,
+        or(constParser("*"), constParser("/")),
+        spaceParser,
+        primeParser()
+      ).map(([, op, , expr]) => [op, expr] as const)
+    )
+  ).map(([expr, ops]) =>
+    ops.reduce(
+      (pre, op) => (op[0] === "*" ? new Mul(pre, op[1]) : new Div(pre, op[1])),
+      expr as Expr
+    )
+  );
+}
 
 // 足し算と引き算を処理するパーサ
-const plusMinusParser = seq(
-  mulDivParser,
-  many(
-    seq(
-      spaceParser,
-      or(constParser("+"), constParser("-")),
-      spaceParser,
-      mulDivParser
-    ).map(
-      ([, op, , expr]) =>
-        [op === "+" ? ("+" as const) : ("-" as const), expr] as const
+function plusMinusParser() {
+  return seq(
+    mulDivParser(),
+    many(
+      seq(
+        spaceParser,
+        or(constParser("+"), constParser("-")),
+        spaceParser,
+        mulDivParser()
+      ).map(
+        ([, op, , expr]) =>
+          [op === "+" ? ("+" as const) : ("-" as const), expr] as const
+      )
     )
-  )
-).map(([num, ops]) =>
-  ops.reduce(
-    (pre, op) => (op[0] === "+" ? new Add(pre, op[1]) : new Sub(pre, op[1])),
-    num as Expr
-  )
-);
+  ).map(([num, ops]) =>
+    ops.reduce(
+      (pre, op) => (op[0] === "+" ? new Add(pre, op[1]) : new Sub(pre, op[1])),
+      num as Expr
+    )
+  );
+}
+
+function exprParser(): Parser<Expr> {
+  return plusMinusParser();
+}
 
 const evaluate = (ast: Expr): number => {
   if (ast instanceof Literal) {
@@ -231,10 +257,8 @@ const evaluate = (ast: Expr): number => {
   }
 };
 
-const exprParser: Parser<Expr> = plusMinusParser;
-
 const run = (src: string) => {
-  const r = exprParser.parse(src);
+  const r = exprParser().parse(src);
   if (r.type === "failure") {
     console.error(r.reasons);
     return;
@@ -244,3 +268,4 @@ const run = (src: string) => {
 };
 
 run("1 + 2 * 3 + 4");
+run("(1+2)*(3*4)");
